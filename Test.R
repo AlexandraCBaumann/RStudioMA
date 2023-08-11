@@ -17,6 +17,7 @@ install.packages("patchwork")
 install.packages("atlastools")
 install.packages("recurse")
 install.packages("ggthemes")
+install.packages("sp")
 
 
 
@@ -31,6 +32,7 @@ library(recurse)
 # for plotting
 library(ggplot2)
 library(patchwork)
+library(sp)
 
 # making a colour palette
 pal <- RColorBrewer::brewer.pal(5, "Set1")
@@ -61,6 +63,15 @@ head(data_raw)
 #> 
 #> 
 #> 
+xy <- cbind.data.frame(data_raw$Longitude, data_raw$Latitude)
+
+df.df <- SpatialPointsDataFrame(coords = xy , data = TABELLE,
+
+proj4string = CRS("+init=epsg:4326"))
+
+#transform
+
+df.df <- spTransform( df.df, CRS("+init=epsg:25832")) # projected
 #> 
 #> # plot data
 fig_data_raw <-
