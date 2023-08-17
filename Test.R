@@ -18,6 +18,8 @@ install.packages("atlastools")
 install.packages("recurse")
 install.packages("ggthemes")
 install.packages("sp")
+install.packages("sf")
+install.packages("rgdal")
 
 
 
@@ -25,6 +27,8 @@ install.packages("sp")
 library(data.table)
 library(atlastools)
 library(stringi)
+library(sf)
+library(rgdal)
 
 # for recursion analysis
 library(recurse)
@@ -43,7 +47,7 @@ pal[3] <- "seagreen"
 # read and plot example data
 ## PC: D:/Desktop/Masterarbeit/GitRepository/RStudioMA/allfemales_till02-2023.csv
 ## Laptop: C:/Users/pauls/Desktop/Masterarbeit/RStudioMA/allfemales_till02-2023.csv
-data <- fread("C:/Users/pauls/Desktop/Masterarbeit/RStudioMA/allfemales_till02-2023.csv")
+data <- fread("D:/Desktop/Masterarbeit/GitRepository/RStudioMA/allfemales_till02-2023.csv")
 data_raw <- copy(data)
 
 
@@ -73,25 +77,16 @@ str(data_raw)
 sum(is.na(data_raw$Longitude))
 sum(is.na(data_raw$Latitude))
 
-data_raw$longitude <- as.numeric(data_raw$Longitude)
-data_raw$longitude <- as.numeric(data_raw$Latitude)
-
 na.omit(data_raw$Longitude)
 na.omit(data_raw$Latitude)
 
-is.numeric(data_raw$Longitude)
+############GPS TO GAUSS####################
 
-################################
-
-xy <- cbind.data.frame(data_raw$Longitude, data_raw$Latitude)
-
-df.df <- SpatialPointsDataFrame(coords = xy , data = TABELLE,
-
-proj4string = CRS("+init=epsg:4326"))
+st_transform()
 
 #transform
 
-df.df <- spTransform( df.df, CRS("+init=epsg:25832")) # projected
+df.df <- spTransform( df.df, CRS("+init=epsg:4326")) # projected
 #> 
 #> # plot data
 fig_data_raw <-
@@ -107,7 +102,7 @@ fig_data_raw <-
     axis.title = element_blank(),
     axis.text = element_blank()
   ) +
-  coord_sf(crs = 25832) 
+  coord_sf(crs = 4326) 
 
 # save figure
 ggsave(fig_data_raw,
@@ -123,7 +118,7 @@ data_unproc <- copy(data)
 # remove inside must be set to falses
 data <- atl_filter_bounds(
   data = data,
-  Longitude = "x", Latitude = "y",
-  x_range = c(645000, max(data$x)),
+  longitude = "x", latitude = "y",
+  x_range = c(645000, max(data$Longitude)),
   remove_inside = FALSE
 )
