@@ -41,6 +41,8 @@ pal[3] <- "seagreen"
 ############Access data and preliminary visualisation##############
 
 # read and plot example data
+## PC: D:/Desktop/Masterarbeit/GitRepository/RStudioMA/allfemales_till02-2023.csv
+## Laptop: C:/Users/pauls/Desktop/Masterarbeit/RStudioMA/allfemales_till02-2023.csv
 data <- fread("C:/Users/pauls/Desktop/Masterarbeit/RStudioMA/allfemales_till02-2023.csv")
 data_raw <- copy(data)
 
