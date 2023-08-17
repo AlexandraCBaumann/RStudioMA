@@ -41,8 +41,10 @@ pal[3] <- "seagreen"
 ############Access data and preliminary visualisation##############
 
 # read and plot example data
-data <- fread("D:/Desktop/Masterarbeit/GitRepository/RStudioMA/allfemales_till02-2023.csv")
+data <- fread("C:/Users/pauls/Desktop/Masterarbeit/RStudioMA/allfemales_till02-2023.csv")
 data_raw <- copy(data)
+
+
 
 # see raw data
 head(data_raw)
@@ -63,6 +65,22 @@ head(data_raw)
 #> 
 #> 
 #> 
+
+str(data_raw)
+
+sum(is.na(data_raw$Longitude))
+sum(is.na(data_raw$Latitude))
+
+data_raw$longitude <- as.numeric(data_raw$Longitude)
+data_raw$longitude <- as.numeric(data_raw$Latitude)
+
+na.omit(data_raw$Longitude)
+na.omit(data_raw$Latitude)
+
+is.numeric(data_raw$Longitude)
+
+################################
+
 xy <- cbind.data.frame(data_raw$Longitude, data_raw$Latitude)
 
 df.df <- SpatialPointsDataFrame(coords = xy , data = TABELLE,
