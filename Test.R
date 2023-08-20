@@ -20,20 +20,21 @@ install.packages("ggthemes")
 install.packages("sp")
 install.packages("sf")
 install.packages("rgdal")
+install.packages("dplyr")
+install.packages("knitr")
 
 
 
-# for data handling
+#####libraries######
+
 library(data.table)
 library(atlastools)
 library(stringi)
 library(sf)
 library(rgdal)
-
-# for recursion analysis
+library(dplyr)
+library(knitr)
 library(recurse)
-
-# for plotting
 library(ggplot2)
 library(patchwork)
 library(sp)
@@ -54,25 +55,10 @@ data_raw <- copy(data)
 
 # see raw data
 head(data_raw)
-#>            TAG          TIME NBS VARX VARY COVXY   SD           Timestamp
-#> 1: 31001001060 1598027365845   6 6.28 2.85 1.682 3.53 2020-08-21 17:29:25
-#> 2: 31001001060 1598027366845   6 2.23 2.23 0.277 2.24 2020-08-21 17:29:26
-#> 3: 31001001060 1598027367845   6 2.94 2.82 0.612 2.64 2020-08-21 17:29:27
-#> 4: 31001001060 1598027368845   6 8.45 3.68 2.734 4.20 2020-08-21 17:29:28
-#> 5: 31001001060 1598027369845   5 6.80 3.26 2.273 3.82 2020-08-21 17:29:29
-#> 6: 31001001060 1598027370845   6 3.95 2.94 0.983 2.98 2020-08-21 17:29:30
-#>            id      x       y Long  Lat             UTCtime    tID
-#> 1: 2020-08-21 650083 5902624 5.25 53.3 2020-08-21 16:29:25 DELETE
-#> 2: 2020-08-21 650083 5902624 5.25 53.3 2020-08-21 16:29:26 DELETE
-#> 3: 2020-08-21 650073 5902622 5.25 53.3 2020-08-21 16:29:27 DELETE
-#> 4: 2020-08-21 650079 5902625 5.25 53.3 2020-08-21 16:29:28 DELETE
-#> 5: 2020-08-21 650067 5902621 5.25 53.3 2020-08-21 16:29:29 DELETE
-#> 6: 2020-08-21 650071 5902621 5.25 53.3 2020-08-21 16:29:30 DELETE
-#> 
-#> 
-#> 
 
-str(data_raw)
+#####data category and omitting NAs#####
+
+str(data)
 
 sum(is.na(data_raw$Longitude))
 sum(is.na(data_raw$Latitude))
@@ -80,17 +66,40 @@ sum(is.na(data_raw$Latitude))
 na.omit(data_raw$Longitude)
 na.omit(data_raw$Latitude)
 
-############GPS TO GAUSS####################
+############GPS TO UTM####################
 
-st_transform()
+latitude <- data$Latitude
+longitude <- data$Longitude
 
-#transform
+# Create a SpatialPoints object with the GPS coordinates
+gps_coords <- SpatialPoints(matrix(c(longitude, latitude), ncol = 2), proj4string = CRS("+proj=longlat +datum=WGS84"))
 
-df.df <- spTransform( df.df, CRS("+init=epsg:4326")) # projected
-#> 
+# Define the UTM projection for Zone 32
+utm_proj <- CRS("+proj=utm +zone=32 +datum=WGS84")
+utm_coords <- spTransform(gps_coords, utm_proj)
+
+# Extract UTM coordinates
+utm_easting <- utm_coords@coords[, 1]
+utm_northing <- utm_coords@coords[, 2]
+
+# Add the UTM coordinates to the original data frame
+data$UTM_Easting <- utm_easting
+data$UTM_Northing <- utm_northing
+
+# Select specific columns from the old file and UTM coordinates
+selected_columns <- c("GMT Time", "Altitude", "Duration", "Temperature", "DOP", "Satellites", "Cause of Fix", "ID", "Voltage", "DateTime", "UTM_Easting", "UTM_Northing")
+new_data <- data[selected_columns]
+
+# Save the new data frame to a new CSV file
+write.csv(new_data, "D:/Desktop/Masterarbeit/GitRepository/RStudioMA/updated_data_with_utm.csv", row.names = FALSE)
+
+# Print a message
+cat("UTM coordinates added to the same file: allfemales_till02-2023.csv\n")
+
+
 #> # plot data
-fig_data_raw <-
-  ggplot(data) +
+fig_new_data <-
+  ggplot(new_data) +
   geom_path(aes(x = Longitude, y = Latitude),
             col = "grey", alpha = 1, size = 0.2
   ) +
@@ -102,7 +111,7 @@ fig_data_raw <-
     axis.title = element_blank(),
     axis.text = element_blank()
   ) +
-  coord_sf(crs = 4326) 
+  coord_sf(crs = 25832) 
 
 # save figure
 ggsave(fig_data_raw,
@@ -110,15 +119,65 @@ ggsave(fig_data_raw,
        width = 185 / 25
 )
 
+##########Read Data from GeoPackage (Studiengebiete) and find minimum and maximum values of polygons##########
+
+gpkg_data <- st_read("D:/Desktop/Masterarbeit/Studiengebiete/Polygone/Oettingen_Steingaden.gpkg")
+gpkg_sf <- st_as_sf(gpkg_data)
+
+# Filter polygons
+polygon_sf <- gpkg_sf[st_geometry_type(gpkg_sf) == "POLYGON"]
+
+# Initialize empty lists to store coordinates
+polygon_coordinates <- list()
+
+# Loop through each polygon
+for (i in 1:length(polygon_sf)) {
+  bbox <- st_bbox(polygon_sf[i])
+  polygon_coordinates[[i]] <- list(
+    polygon_name = polygon_sf[i]$name_column,  # Replace with your polygon's identifier
+    min_coordinates = c(bbox["xmin"], bbox["ymin"]),
+    max_coordinates = c(bbox["xmax"], bbox["ymax"])
+  )
+}
+
+# Print the results for each polygon
+for (i in 1:length(polygon_coordinates)) {
+  polygon_info <- polygon_coordinates[[i]]
+  cat("Polygon Name:", polygon_info$polygon_name, "\n")
+  cat("Minimum Coordinates:", polygon_info$min_coordinates, "\n")
+  cat("Maximum Coordinates:", polygon_info$max_coordinates, "\n")
+  cat("\n")
+}
+
+
+##########Read Data from GeoPackage (Studiengebiete) and define Bounding Boxes ##########
+
+gpkg_data <- st_read("D:/Desktop/Masterarbeit/Studiengebiete/Polygone/Oettingen_Steingaden.gpkg")
+
+study_areas <- list(
+  list(name = "Oettingen", x_range = c(590761.3, 646606)),
+  list(name = "Steingaden", x_range = c(5276998, 5468585)),
+)
+
+filtered_data <- new_data
+
+for (area in study_areas) {
+  filtered_data <- atl_filter_bounds(
+    data = filtered_data,
+    longitude = "Longitude", latitude = "Latitude",
+    x_range = area$x_range,
+    remove_inside = FALSE
+  )
+}
 
 ########## FILTER BY BOUNDING BOX #############
 
-data_unproc <- copy(data)
+data_unproc <- new_data
 
 # remove inside must be set to falses
-data <- atl_filter_bounds(
-  data = data,
-  longitude = "x", latitude = "y",
+new_data <- atl_filter_bounds(
+  data = new_data,
+  longitude = "Longitude", latitude = "Latitude",
   x_range = c(645000, max(data$Longitude)),
   remove_inside = FALSE
 )
