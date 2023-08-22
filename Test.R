@@ -58,13 +58,13 @@ head(data_raw)
 
 #####data category and omitting NAs#####
 
-str(data)
+#str(data)
 
-sum(is.na(data_raw$Longitude))
-sum(is.na(data_raw$Latitude))
+#sum(is.na(data_raw$Longitude))
+#sum(is.na(data_raw$Latitude))
 
-na.omit(data_raw$Longitude)
-na.omit(data_raw$Latitude)
+#na.omit(data_raw$Longitude)
+#na.omit(data_raw$Latitude)
 
 ############GPS TO UTM####################
 
@@ -97,10 +97,10 @@ write.csv(new_data, "D:/Desktop/Masterarbeit/GitRepository/RStudioMA/updated_dat
 cat("UTM coordinates added to the same file: allfemales_till02-2023.csv\n")
 
 
-#> # plot data
+# plot data
 fig_new_data <-
   ggplot(new_data) +
-  geom_path(aes(x = Longitude, y = Latitude),
+  geom_path(aes(x = UTM_Easting, y = UTM_Northing),
             col = "grey", alpha = 1, size = 0.2
   ) +
   geom_point(aes(x = Longitude, y = Latitude),
@@ -134,7 +134,7 @@ polygon_coordinates <- list()
 for (i in 1:length(polygon_sf)) {
   bbox <- st_bbox(polygon_sf[i])
   polygon_coordinates[[i]] <- list(
-    polygon_name = polygon_sf[i]$name_column,  # Replace with your polygon's identifier
+    polygon_name = polygon_sf[i]$"1",  # Replace with your polygon's identifier
     min_coordinates = c(bbox["xmin"], bbox["ymin"]),
     max_coordinates = c(bbox["xmax"], bbox["ymax"])
   )
@@ -154,30 +154,83 @@ for (i in 1:length(polygon_coordinates)) {
 
 gpkg_data <- st_read("D:/Desktop/Masterarbeit/Studiengebiete/Polygone/Oettingen_Steingaden.gpkg")
 
+
+bounding_boxes <- data.frame(
+  xmin = c(590761.3),  # Replace with actual values
+  xmax = c(646606),    # Replace with actual values
+  ymin = c(5276998),    # Replace with actual values
+  ymax = c(5468585)     # Replace with actual values
+)
+
+# Define study areas
 study_areas <- list(
-  list(name = "Oettingen", x_range = c(590761.3, 646606)),
-  list(name = "Steingaden", x_range = c(5276998, 5468585)),
+  list(name = "Study Area 1", x_range = c(bounding_boxes[1, "xmin"], bounding_boxes[1, "xmax"]), y_range = c(bounding_boxes[1, "ymin"], bounding_boxes[1, "ymax"]))
 )
 
 filtered_data <- new_data
 
-for (area in study_areas) {
-  filtered_data <- atl_filter_bounds(
-    data = filtered_data,
-    longitude = "Longitude", latitude = "Latitude",
-    x_range = area$x_range,
-    remove_inside = FALSE
-  )
+point_in_bbox <- function(point, bbox) {
+  x_in_range <- point["UTM_Easting"] >= bbox["xmin"] & point["UTM_Easting"] <= bbox["xmax"]
+  y_in_range <- point["UTM_Northing"] >= bbox["ymin"] & point["UTM_Northing"] <= bbox["ymax"]
+  return(x_in_range & y_in_range)
 }
+
+# Filter data for each study area
+filtered_data <- list()
+
+for (area in study_areas) {
+  bbox <- c("xmin" = area$x_range[1], "xmax" = area$x_range[2], "ymin" = area$y_range[1], "ymax" = area$y_range[2])
+  filtered_data[[area$name]] <- new_data[apply(new_data, 1, point_in_bbox, bbox), ]
+}
+
+# Define the base plot
+base_plot <- ggplot() +
+  geom_path(data = new_data, aes(x = UTM_Easting, y = UTM_Northing),
+            col = "grey", alpha = 1, size = 0.2) +
+  geom_point(data = new_data, aes(x = UTM_Easting, y = UTM_Northing),
+             col = "grey", alpha = 0.2, size = 0.2) +
+  ggthemes::theme_few() +
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_blank()
+  ) +
+  coord_sf(crs = 25832)
+
+# Loop through each study area and create a plot
+for (area_name in names(filtered_data)) {
+  study_data <- filtered_data[[area_name]]
+  
+  plot <- base_plot +
+    geom_path(data = study_data, aes(x = UTM_Easting, y = UTM_Northing),
+              col = pal[1], alpha = 1, size = 0.2) +
+    geom_point(data = study_data, aes(x = UTM_Easting, y = UTM_Northing),
+               col = pal[1], alpha = 0.5, size = 0.5)
+  
+  # Save the figure
+  ggsave(plot,
+         filename = "D:/Desktop/Masterarbeit/GitRepository/RStudioMA/Plots/fig_bounding_box.png",
+         width = 185 / 25)
+}
+
+
+#for (area in study_areas) {
+#  filtered_data <- atl_filter_bounds(
+#    data = filtered_data,
+#    longitude = "UTM_Easting", latitude = "UTM_Northing",
+#    x_range = area$x_range,
+#    y_range = area$y_range,
+#    remove_inside = FALSE
+#  )
+#}
 
 ########## FILTER BY BOUNDING BOX #############
 
-data_unproc <- new_data
+#data_unproc <- new_data
 
 # remove inside must be set to falses
-new_data <- atl_filter_bounds(
-  data = new_data,
-  longitude = "Longitude", latitude = "Latitude",
-  x_range = c(645000, max(data$Longitude)),
-  remove_inside = FALSE
-)
+#new_data <- atl_filter_bounds(
+#  data = new_data,
+#  longitude = "Longitude", latitude = "Latitude",
+#  x_range = c(645000, max(data$Longitude)),
+#  remove_inside = FALSE
+#)
