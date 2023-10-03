@@ -1,6 +1,8 @@
 #install.packages ("lidR")
 #install.packages("RCSF")
 
+#citation()
+
 PLOT <- FALSE
 YEAR <- 2021
 
