@@ -13,7 +13,7 @@ library(patchwork)
 library(sp)
 
 
-# Set your working directory
+# Set working directory
 setwd("D:/Desktop/Masterarbeit/GitRepository/RStudioMA")
 
 # Read the CSV file
@@ -36,13 +36,11 @@ for (id in unique_ids) {
   # Subset data for the current ID
   current_data <- allfemales_data[allfemales_data$ID == id, ]
 
-  # Rename columns if needed (similar to your previous code)
+  # Rename columns
   colnames(current_data)[colnames(current_data) == "UTM_Northing"] <- "x"
   colnames(current_data)[colnames(current_data) == "UTM_Easting"] <- "y"
   colnames(current_data)[colnames(current_data) == "Unix_Time"] <- "time"
 
-
-  # Store the data frame in the list
   individual_data_frames[[id]] <- current_data
 }
 
@@ -78,16 +76,19 @@ for (id in unique_ids) {
   individual_data_frames[[id]] <- current_data
 }
 
-# Create an empty list to store individual plots
+####Plot and save unfiltered Trajectories####
+
+output_dir <- "D:/Desktop/Masterarbeit/GitRepository/RStudioMA/Plots/Trajectory_Plots_Raw"
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir, recursive = TRUE)
+}
+
 individual_plots <- list()
 
 # Loop through unique IDs and create ggplot2 plots
 for (id in unique_ids) {
   # Get the current individual's data frame
   current_data <- individual_data_frames[[id]]
-  
-  # Print the ID to check which one is being processed
-  print(id)
   
   # Create a ggplot2 plot for the current individual
   individual_plots[[id]] <- ggplot(current_data, aes(x = x, y = y, group = ID, color = as.factor(ID))) +
@@ -96,83 +97,72 @@ for (id in unique_ids) {
          x = "X Coordinate",
          y = "Y Coordinate") +
     theme_minimal()
+  
+  # Generate a filename and save
+  plot_filename <- file.path(output_dir, paste("Individual_ID_", id, ".png", sep = ""))
+  ggsave(plot_filename, plot = individual_plots[[id]], width = 6, height = 4, dpi = 300)
 }
 
-# Print the individual plots to the console
-print(individual_plots)
+cat("All individual plots have been saved to", output_dir, "\n")
 
 
+####Smoothing trajectories#####
 
-# # Loop through the list of individual data frames to process each one
-# for (id in unique_ids) {
-#   # Get the current individual's data frame
-#   current_data <- individual_data_frames[[id]]
-#   
-#   # Remove speed outliers
-#   current_data <- atl_filter_covariates(
-#     allfemales_data = current_data,
-#     filters = c("(speed_in < 15 & speed_out < 15)")
-#   )
-#   
-#   # Recalculate speed and angle
-#   current_data[, `:=`(
-#     speed_in = atl_get_speed(current_data, x = "x", y = "y", time = "time"),
-#     speed_out = atl_get_speed(current_data, type = "out")
-#   )]
-#   
-#   current_data[, angle := atl_turning_angle(allfemales_data = current_data)]
-#   
-#   # Apply the atl_median_smooth function
-#   current_data <- atl_median_smooth(
-#     allfemales_data = current_data,
-#     x = "x", y = "y", time = "time",
-#     moving_window = 5
-#   )
-#   
-#   # Update the data frame in the list
-#   individual_data_frames[[id]] <- current_data
-# }
+# Loop through the list of individual data frames to process each one
+for (id in unique_ids) {
+  # Get the current individual's data frame
+  current_data <- individual_data_frames[[id]]
+  
+  # Remove speed outliers
+  current_data <- atl_filter_covariates(
+    data = current_data,  # Use 'data' instead of 'allfemales_data'
+    filters = c("(speed_in < 15 & speed_out < 15)")
+  )
+  
+  # Recalculate speed and angle
+  current_data[, `:=`(
+    speed_in = atl_get_speed(current_data, x = "x", y = "y", time = "time"),
+    speed_out = atl_get_speed(current_data, type = "out")
+  )]
+  
+  # add turning angle
+  current_data[, angle := atl_turning_angle(data = current_data)]
+  
+  # Apply the atl_median_smooth function
+  current_data <- atl_median_smooth(
+    data = current_data,  # Use 'data' instead of 'allfemales_data'
+    x = "x", y = "y", time = "time",
+    moving_window = 5
+  )
+  
+  # Update the data frame in the list
+  individual_data_frames[[id]] <- current_data
+}
 
-# 
-# 
-# # remove speed outliers
-# allfemales_data <- atl_filter_covariates(
-#   allfemales_data = allfemales_data,
-#   filters = c("(speed_in < 15 & speed_out < 15)")
-# )
-# 
-# # recalculate speed and angle
-# allfemales_data[, `:=`(
-#   speed_in = atl_get_speed(allfemales_data,
-#                            x = "x",
-#                            y = "y",
-#                            time = "time"
-#   ),
-#   speed_out = atl_get_speed(allfemales_data, type = "out")
-# )]
-# 
-# # add turning angle
-# allfemales_data[, angle := atl_turning_angle(allfemales_data = allfemales_data)]
-# 
-# 
-# 
-# # now apply the smooth
-# atl_median_smooth(
-#   allfemales_data = allfemales_data,
-#   x = "x", y = "y", time = "time",
-#   moving_window = 5
-# )
+####Plot and save smoothed Data###
 
+individual_smoothed_plots <- list()
+smoothed_output_dir <- "D:/Desktop/Masterarbeit/GitRepository/RStudioMA/Plots/Trajectory_Plots_Smoothed"
 
-# Define the UTM32N CRS
-utm_crs <- st_crs("+proj=utm +zone=32 +datum=WGS84 +units=m +no_defs")
+if (!dir.exists(smoothed_output_dir)) {
+  dir.create(smoothed_output_dir, recursive = TRUE)
+}
 
+for (id in unique_ids) {
+  # Get the current individual's smoothed data frame
+  current_smoothed_data <- individual_data_frames[[id]]
+  
+  individual_smoothed_plots[[id]] <- ggplot(current_smoothed_data, aes(x = x, y = y, group = ID, color = as.factor(ID))) +
+    geom_path() +
+    labs(title = paste("Smoothed Individual ID:", id),
+         x = "X Coordinate",
+         y = "Y Coordinate") +
+    theme_minimal()
+  
+  # Generate a filename for the smoothed plot, save
+  smoothed_plot_filename <- file.path(smoothed_output_dir, paste("Smoothed_Individual_ID_", id, ".png", sep = ""))
+  ggsave(smoothed_plot_filename, plot = individual_smoothed_plots[[id]], width = 6, height = 4, dpi = 300)
+}
 
-# 
-# # Create a ggplot object to plot trajectories
-# ggplot(filtered_data, aes(x = x, y = y, group = ID, color = as.factor(ID))) +
-#   geom_path() +
-#   labs(title = "Trajectories of Individuals",
-#        x = "X Coordinate",
-#        y = "Y Coordinate") +
-#   theme_minimal()
+cat("All smoothed individual plots have been saved to", smoothed_output_dir, "\n")
+
